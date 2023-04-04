@@ -7,6 +7,11 @@ import { ChatLayout } from '@/views/chat/layout'
 const routes: RouteRecordRaw[] = [
   {
     path: '/',
+    name: 'Empty',
+    component: () => import('@/views/exception/empty/index.vue'),
+  },
+  {
+    path: '/hello-world',
     name: 'Root',
     component: ChatLayout,
     redirect: '/chat',
