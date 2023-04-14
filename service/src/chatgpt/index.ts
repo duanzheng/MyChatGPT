@@ -8,7 +8,7 @@ import fetch from 'node-fetch'
 import axios from 'axios'
 import { sendResponse } from '../utils'
 import { isNotEmptyString } from '../utils/is'
-import type { ApiModel, ChatContext, ChatGPTUnofficialProxyAPIOptions, ModelConfig } from '../types'
+import type { ChatContext, ChatGPTUnofficialProxyAPIOptions, ModelConfig } from '../types'
 
 const ErrorCodeMessage: Record<string, string> = {
   401: '[OpenAI] 提供错误的API密钥 | Incorrect API key provided',
@@ -23,12 +23,11 @@ dotenv.config()
 
 const timeoutMs: number = !isNaN(+process.env.TIMEOUT_MS) ? +process.env.TIMEOUT_MS : 30 * 1000
 
-let apiModel: ApiModel
-
 if (!process.env.OPENAI_API_KEY && !process.env.OPENAI_ACCESS_TOKEN)
   throw new Error('Missing OPENAI_API_KEY or OPENAI_ACCESS_TOKEN environment variable')
 
 let api: ChatGPTAPI | ChatGPTUnofficialProxyAPI
+let apiV4: ChatGPTUnofficialProxyAPI
 
 (async () => {
   // More Info: https://github.com/transitive-bullshit/chatgpt-api
@@ -49,12 +48,13 @@ let api: ChatGPTAPI | ChatGPTUnofficialProxyAPI
     setupProxy(options)
 
     api = new ChatGPTAPI({ ...options })
-    apiModel = 'ChatGPTAPI'
   }
-  else {
+
+  if (process.env.OPENAI_ACCESS_TOKEN) {
     const options: ChatGPTUnofficialProxyAPIOptions = {
       accessToken: process.env.OPENAI_ACCESS_TOKEN,
       debug: true,
+      model: 'gpt-4',
     }
 
     if (isNotEmptyString(process.env.API_REVERSE_PROXY))
@@ -62,32 +62,43 @@ let api: ChatGPTAPI | ChatGPTUnofficialProxyAPI
 
     setupProxy(options)
 
-    api = new ChatGPTUnofficialProxyAPI({ ...options })
-    apiModel = 'ChatGPTUnofficialProxyAPI'
+    apiV4 = new ChatGPTUnofficialProxyAPI({ ...options })
   }
 })()
 
 async function chatReplyProcess(
   message: string,
-  lastContext?: { conversationId?: string; parentMessageId?: string },
+  chatContext?: { conversationId?: string; parentMessageId?: string; v4?: boolean },
   process?: (chat: ChatMessage) => void,
 ) {
   try {
     let options: SendMessageOptions = { timeoutMs }
+    const useGPT4 = chatContext?.v4 && apiV4
 
-    if (lastContext) {
-      if (apiModel === 'ChatGPTAPI')
-        options = { parentMessageId: lastContext.parentMessageId }
+    if (chatContext) {
+      if (useGPT4)
+        options = { ...chatContext }
       else
-        options = { ...lastContext }
+        options = { parentMessageId: chatContext.parentMessageId }
     }
 
-    const response = await api.sendMessage(message, {
-      ...options,
-      onProgress: (partialResponse) => {
-        process?.(partialResponse)
-      },
-    })
+    let response
+    if (useGPT4) {
+      response = await apiV4.sendMessage(message, {
+        ...options,
+        onProgress: (partialResponse) => {
+          process?.(partialResponse)
+        },
+      })
+    }
+    else {
+      response = await api.sendMessage(message, {
+        ...options,
+        onProgress: (partialResponse) => {
+          process?.(partialResponse)
+        },
+      })
+    }
 
     return sendResponse({ type: 'Success', data: response })
   }
@@ -131,7 +142,7 @@ async function chatConfig() {
     : '-'
   return sendResponse<ModelConfig>({
     type: 'Success',
-    data: { apiModel, reverseProxy, timeoutMs, socksProxy, httpsProxy, balance },
+    data: { reverseProxy, timeoutMs, socksProxy, httpsProxy, balance },
   })
 }
 
@@ -158,10 +169,6 @@ function setupProxy(options: ChatGPTAPIOptions | ChatGPTUnofficialProxyAPIOption
   }
 }
 
-function currentModel(): ApiModel {
-  return apiModel
-}
-
 export type { ChatContext, ChatMessage }
 
-export { chatReplyProcess, chatConfig, currentModel }
+export { chatReplyProcess, chatConfig }
