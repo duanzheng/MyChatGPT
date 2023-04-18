@@ -47,7 +47,13 @@ let apiV4: ChatGPTUnofficialProxyAPI
 
     setupProxy(options)
 
-    api = new ChatGPTAPI({ ...options })
+    api = new ChatGPTAPI({
+      ...options,
+      completionParams: {
+        temperature: 0.5,
+      },
+      maxResponseTokens: 4096,
+    })
   }
 
   if (process.env.OPENAI_ACCESS_TOKEN) {
