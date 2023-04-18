@@ -38,7 +38,7 @@ let apiV4: ChatGPTUnofficialProxyAPI
 
     const options: ChatGPTAPIOptions = {
       apiKey: process.env.OPENAI_API_KEY,
-      completionParams: { model, temperature: 0.5 },
+      completionParams: { model },
       debug: true,
     }
 
@@ -49,7 +49,7 @@ let apiV4: ChatGPTUnofficialProxyAPI
 
     api = new ChatGPTAPI({
       ...options,
-      maxResponseTokens: 4096,
+      maxResponseTokens: 2000,
     })
   }
 
