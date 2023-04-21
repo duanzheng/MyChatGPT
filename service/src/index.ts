@@ -17,6 +17,10 @@ app.all('*', (_, res, next) => {
   next()
 })
 
+router.get('/health', (_, res) => {
+  res.send('OK')
+})
+
 router.post('/chat-process', auth, async (req, res) => {
   res.setHeader('Content-type', 'application/octet-stream')
 
